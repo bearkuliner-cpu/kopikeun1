@@ -82,6 +82,7 @@ class DashboardController extends Controller
                 ->get();
 
 
+            
             /*
             |--------------------------------------------------------------------------
             | Outlet Income
@@ -91,24 +92,22 @@ class DashboardController extends Controller
             $outletIncome = $sales
                 ->where('sale_source', 'Outlet')
                 ->sum(function ($sale) {
-
                     return $sale->details->sum('subtotal');
-
                 });
 
 
             /*
             |--------------------------------------------------------------------------
-            | Employee Income
+            | Distribution Income
             |--------------------------------------------------------------------------
             */
 
-            $employeeIncome = $sales
-                ->where('sale_source', 'Employee')
+            $distributionIncome = $sales
+                ->filter(function ($sale) {
+                    return !is_null($sale->distribution_id);
+                })
                 ->sum(function ($sale) {
-
                     return $sale->details->sum('subtotal');
-
                 });
 
 
@@ -118,10 +117,9 @@ class DashboardController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            $totalIncome =
-                $outletIncome +
-                $employeeIncome;
-
+            $totalIncome = $sales->sum(function ($sale) {
+                return $sale->details->sum('subtotal');
+            });
 
             /*
             |--------------------------------------------------------------------------
@@ -342,7 +340,7 @@ class DashboardController extends Controller
                     'startDate',
                     'endDate',
                     'outletIncome',
-                    'employeeIncome',
+                    'distributionIncome',
                     'totalIncome',
                     'incomingGoodsExpense',
                     'operationalExpense',
@@ -555,7 +553,6 @@ class DashboardController extends Controller
                 'details.product',
                 'distribution.assignment.employee.user',
             ])
-                ->where('sale_source', 'Employee')
                 ->whereHas('distribution.assignment', function ($query) use ($employee) {
                     $query->where('employee_id', $employee->id);
                 })

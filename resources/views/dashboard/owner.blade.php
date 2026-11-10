@@ -57,7 +57,7 @@
                     </p>
 
                     <p class="mt-1 text-xs text-stone-500">
-                        Outlet + Employee Sales
+                        Outlet + Distribution Sales
                     </p>
 
                 </div>
@@ -155,15 +155,15 @@
                         </div>
 
 
-                        {{-- Employee --}}
+                        {{-- Distribution --}}
                         <div class="flex items-center justify-between">
 
                             <span class="text-sm text-stone-500">
-                                Employee Sales
+                                Distribution Sales
                             </span>
 
                             <span class="text-sm font-semibold text-stone-800">
-                                Rp {{ number_format($employeeIncome, 0, ',', '.') }}
+                                Rp {{ number_format($distributionIncome, 0, ',', '.') }}
                             </span>
 
                         </div>
