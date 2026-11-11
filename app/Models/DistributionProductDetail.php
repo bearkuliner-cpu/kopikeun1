@@ -12,11 +12,17 @@ class DistributionProductDetail extends Model
         'base_drink_id',
         'quantity_distributed',
         'quantity_returned',
+        'quantity_stored',
+        'quantity_wasted',
+        'quantity_consumed',
     ];
 
     protected $casts = [
         'quantity_distributed' => 'integer',
         'quantity_returned' => 'integer',
+        'quantity_stored' => 'integer',
+        'quantity_wasted' => 'integer',
+        'quantity_consumed' => 'integer',
     ];
 
     public function distribution(): BelongsTo
