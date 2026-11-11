@@ -194,7 +194,7 @@
                         </p>
 
                     </div>
-
+                                        
                     {{-- Employee Code --}}
                     <div>
                         <label
@@ -206,22 +206,21 @@
 
                         <input
                             type="text"
-                            name="employee_code"
                             id="employee_code"
-                            value="{{ old('employee_code') }}"
-                            placeholder="e.g. EMP001"
-                            required
+                            value="Generated automatically"
+                            readonly
                             class="mt-1 block w-full rounded-lg border-stone-300
-                                   shadow-sm focus:border-amber-600
-                                   focus:ring-amber-600"
+                                bg-stone-100 text-stone-500 shadow-sm
+                                cursor-not-allowed"
                         >
 
-                        @error('employee_code')
-                            <p class="mt-1 text-sm text-red-600">
-                                {{ $message }}
-                            </p>
-                        @enderror
+                        <p class="mt-1 text-xs text-stone-500">
+                            Employee code will be generated automatically
+                            when the employee is saved.
+                            Example: KK-EMP-003.
+                        </p>
                     </div>
+
 
                     {{-- Phone --}}
                     <div>

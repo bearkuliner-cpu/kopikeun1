@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Str;
 
 class EmployeeController extends Controller
 {
@@ -73,13 +74,6 @@ class EmployeeController extends Controller
             ],
 
             // Employee information
-            'employee_code' => [
-                'required',
-                'string',
-                'max:50',
-                'unique:employees,employee_code',
-            ],
-
             'phone' => [
                 'nullable',
                 'string',
@@ -112,12 +106,34 @@ class EmployeeController extends Controller
                 'role_id' => $role->id_role,
             ]);
 
-            Employee::create([
+            // Create employee with temporary unique code.
+            $employee = Employee::create([
                 'user_id' => $user->id,
-                'employee_code' => $validated['employee_code'],
+                'employee_code' => 'TEMP-' . Str::uuid(),
                 'phone' => $validated['phone'] ?? null,
                 'address' => $validated['address'] ?? null,
                 'status' => $validated['status'],
+            ]);
+
+            // Generate employee code based on employee ID.
+            $sequence = $employee->id;
+
+            do {
+                $employeeCode = 'KK-EMP-' . str_pad(
+                    $sequence,
+                    3,
+                    '0',
+                    STR_PAD_LEFT
+                );
+
+                $sequence++;
+            } while (
+                Employee::where('employee_code', $employeeCode)->exists()
+            );
+
+            // Save generated employee code.
+            $employee->update([
+                'employee_code' => $employeeCode,
             ]);
         });
 
