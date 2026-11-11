@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\Distribution;
 use App\Models\OperationalItem;
 use App\Models\BaseDrink;
+use App\Models\Sale;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -348,6 +349,35 @@ class DistributionController extends Controller
          */
         $operationalItems = OperationalItem::orderBy('name')
             ->get();
+        
+        $sales = Sale::with([
+            'details.product',
+        ])
+            ->where('distribution_id', $distribution->id)
+            ->get();
+
+        $soldQuantities = $sales
+            ->flatMap(fn ($sale) => $sale->details)
+            ->filter(fn ($detail) => $detail->product !== null)
+            ->groupBy(fn ($detail) => $detail->product->base_drink_id)
+            ->map(fn ($details) => $details->sum('quantity'));
+
+        $salesSummary = $distribution->productDetails
+            ->groupBy('base_drink_id')
+            ->map(function ($details, $baseDrinkId) use ($soldQuantities) {
+                $firstDetail = $details->first();
+
+                $distributed = $details->sum('quantity_distributed');
+                $sold = (int) ($soldQuantities->get($baseDrinkId, 0));
+
+                return [
+                    'base_drink' => $firstDetail->baseDrink->name,
+                    'distributed' => $distributed,
+                    'sold' => $sold,
+                    'remaining' => $distributed - $sold,
+                ];
+            })
+            ->values();
 
         return view(
             'distributions.edit',
@@ -355,7 +385,8 @@ class DistributionController extends Controller
                 'distribution',
                 'assignments',
                 'baseDrinks',
-                'operationalItems'
+                'operationalItems',
+                'salesSummary'
             )
         );
     }

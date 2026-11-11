@@ -187,6 +187,101 @@
 
 
                 {{-- ========================================================= --}}
+                {{-- Sales Summary --}}
+                {{-- ========================================================= --}}
+
+                <x-app-card>
+                    <div class="mb-5">
+                        <h3 class="text-base font-bold text-stone-900">
+                            Sales Summary
+                        </h3>
+
+                        <p class="mt-1 text-sm text-stone-500">
+                            Comparison between distributed and sold base drinks.
+                        </p>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-stone-200 text-left">
+                                    <th class="px-3 py-3 font-semibold text-stone-600">
+                                        Base Drink
+                                    </th>
+                                    <th class="px-3 py-3 text-right font-semibold text-stone-600">
+                                        Distributed
+                                    </th>
+                                    <th class="px-3 py-3 text-right font-semibold text-stone-600">
+                                        Sold
+                                    </th>
+                                    <th class="px-3 py-3 text-right font-semibold text-stone-600">
+                                        Difference
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @forelse ($salesSummary as $item)
+                                    <tr class="border-b border-stone-100">
+                                        <td class="px-3 py-3 font-medium text-stone-800">
+                                            {{ $item['base_drink'] }}
+                                        </td>
+
+                                        <td class="px-3 py-3 text-right text-stone-700">
+                                            {{ number_format($item['distributed']) }}
+                                        </td>
+
+                                        <td class="px-3 py-3 text-right text-green-700">
+                                            {{ number_format($item['sold']) }}
+                                        </td>
+
+                                        <td class="px-3 py-3 text-right font-semibold text-amber-700">
+                                            {{ number_format($item['remaining']) }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4"
+                                            class="px-3 py-6 text-center text-stone-500">
+                                            No base drink distribution data available.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+
+                            @if ($salesSummary->isNotEmpty())
+                                <tfoot>
+                                    <tr class="bg-stone-50 font-bold">
+                                        <td class="px-3 py-3 text-stone-800">
+                                            Total
+                                        </td>
+
+                                        <td class="px-3 py-3 text-right">
+                                            {{ number_format($salesSummary->sum('distributed')) }}
+                                        </td>
+
+                                        <td class="px-3 py-3 text-right text-green-700">
+                                            {{ number_format($salesSummary->sum('sold')) }}
+                                        </td>
+
+                                        <td class="px-3 py-3 text-right text-amber-700">
+                                            {{ number_format($salesSummary->sum('remaining')) }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            @endif
+                        </table>
+                    </div>
+
+                    <p class="mt-3 text-xs text-stone-500">
+                        Difference is calculated from distributed quantity minus sold quantity.
+                        It does not represent the actual returned quantity.
+                    </p>
+                </x-app-card>
+
+
+
+                {{-- ========================================================= --}}
                 {{-- Base Drinks --}}
                 {{-- ========================================================= --}}
 
