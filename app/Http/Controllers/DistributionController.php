@@ -126,6 +126,24 @@ class DistributionController extends Controller
                 'min:0',
             ],
 
+            'products.*.quantity_stored' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+
+            'products.*.quantity_wasted' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+
+            'products.*.quantity_consumed' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+
             /*
              * Operational items
              */
@@ -187,99 +205,66 @@ class DistributionController extends Controller
 
         DB::transaction(function () use ($validated) {
 
-            /*
-             * Create distribution header.
-             */
-            $distribution = Distribution::create([
-                'assignment_id' =>
-                    $validated['assignment_id'],
+        /*
+        * Create distribution header.
+        */
+        $distribution = Distribution::create([
+            'assignment_id' =>
+                $validated['assignment_id'],
 
-                'distribution_date' =>
-                    $validated['distribution_date'],
+            'distribution_date' =>
+                $validated['distribution_date'],
 
-                'notes' =>
-                    $validated['notes'] ?? null,
+            'notes' =>
+                $validated['notes'] ?? null,
+        ]);
+
+        /*
+        * Base drinks.
+        *
+        * Base drinks do NOT affect stock.
+        */
+        foreach ($validated['products'] ?? [] as $item) {
+            $distribution->productDetails()->create([
+                'base_drink_id' => $item['base_drink_id'],
+                'quantity_distributed' => $item['quantity_distributed'],
+                'quantity_returned' => $item['quantity_returned'],
+                'quantity_stored' => $item['quantity_stored'] ?? 0,
+                'quantity_wasted' => $item['quantity_wasted'] ?? 0,
+                'quantity_consumed' => $item['quantity_consumed'] ?? 0,
             ]);
+        }
 
-            /*
-             * Base drinks.
-             *
-             * Base drinks do NOT affect stock.
-             */
-            foreach (
-                $validated['products'] ?? []
-                as $item
-            ) {
-                $distribution->productDetails()->create([
-                    'base_drink_id' =>
-                        $item['base_drink_id'],
+        foreach ($validated['products'] ?? [] as $index => $item) {
+            $stored = (int) ($item['quantity_stored'] ?? 0);
+            $wasted = (int) ($item['quantity_wasted'] ?? 0);
+            $consumed = (int) ($item['quantity_consumed'] ?? 0);
 
-                    'quantity_distributed' =>
-                        $item['quantity_distributed'],
+            $returned = (int) $item['quantity_returned'];
 
-                    'quantity_returned' =>
-                        $item['quantity_returned'],
-                ]);
+            if ($returned !== ($stored + $wasted + $consumed)) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        "products.$index.quantity_returned" =>
+                            'Returned quantity must equal the sum of stored, wasted, and consumed quantities.',
+                    ]);
             }
+        }
 
-            /*
-             * Operational items.
-             */
-            foreach (
-                $validated['operational_items'] ?? []
-                as $item
-            ) {
-                $operationalItem = OperationalItem::findOrFail(
-                    $item['operational_item_id']
-                );
+        /*
+        * Create operational details.
+        */
+        $totalBaseDrinks = $this->calculateTotalBaseDrinks(
+            $validated['products'] ?? []
+        );
 
-                $distributed =
-                    $item['quantity_distributed'];
-
-                $returned =
-                    $item['quantity_returned'];
-
-                /*
-                 * Actual quantity that remains outside
-                 * the warehouse.
-                 */
-                $netQuantity =
-                    $distributed - $returned;
-
-                /*
-                 * Make sure stock is sufficient.
-                 */
-                if ($netQuantity > $operationalItem->stock) {
-                    throw new \Exception(
-                        "Insufficient stock for {$operationalItem->name}."
-                    );
-                }
-
-                /*
-                 * Create detail.
-                 */
-                $distribution->operationalDetails()->create([
-                    'operational_item_id' =>
-                        $operationalItem->id,
-
-                    'quantity_distributed' =>
-                        $distributed,
-
-                    'quantity_returned' =>
-                        $returned,
-                ]);
-
-                /*
-                 * Reduce stock only by the net quantity.
-                 */
-                if ($netQuantity > 0) {
-                    $operationalItem->decrement(
-                        'stock',
-                        $netQuantity
-                    );
-                }
-            }
-        });
+        $this->createOperationalDetails(
+            $distribution,
+            $validated['operational_items'] ?? [],
+            $totalBaseDrinks
+        );
+    });
 
         return redirect()
             ->route('distributions.index')
@@ -438,6 +423,24 @@ class DistributionController extends Controller
 
             'products.*.quantity_returned' => [
                 'required',
+                'integer',
+                'min:0',
+            ],
+
+            'products.*.quantity_stored' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+
+            'products.*.quantity_wasted' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+
+            'products.*.quantity_consumed' => [
+                'nullable',
                 'integer',
                 'min:0',
             ],
@@ -702,5 +705,133 @@ class DistributionController extends Controller
                 'success',
                 'Distribution deleted successfully.'
             );
+    }
+
+    /**
+     * Get automatic operational items.
+     */
+    private function getAutomaticOperationalItems()
+    {
+        return OperationalItem::whereIn('name', [
+            'Cup plastik',
+            'Tutup cup',
+        ])->get()->keyBy('name');
+    }
+
+    /**
+     * Calculate total distributed base drinks.
+     */
+    private function calculateTotalBaseDrinks(array $products): int
+    {
+        return collect($products)->sum(
+            fn ($item) => (int) $item['quantity_distributed']
+        );
+    }
+
+    /**
+     * Create operational distribution details.
+     *
+     * Cup and lid quantities are calculated automatically
+     * from the total distributed base drinks.
+     */
+    private function createOperationalDetails(
+        Distribution $distribution,
+        array $items,
+        int $totalBaseDrinks
+    ): void {
+        $automaticItems = $this->getAutomaticOperationalItems();
+
+        if (
+            !$automaticItems->has('Cup plastik') ||
+            !$automaticItems->has('Tutup cup')
+        ) {
+            throw new \Exception(
+                'Cup plastik or Tutup cup operational item was not found.'
+            );
+        }
+
+        $submittedItems = collect($items)->keyBy('operational_item_id');
+
+        $automaticIds = $automaticItems->pluck('id')->all();
+
+        /*
+        * 1. Create automatic cup and lid details.
+        */
+        foreach ($automaticItems as $name => $operationalItem) {
+            $returned = (int) (
+                $submittedItems->get($operationalItem->id)['quantity_returned'] ?? 0
+            );
+
+            if ($returned > $totalBaseDrinks) {
+                throw new \Exception(
+                    "Returned quantity for {$name} cannot exceed distributed quantity."
+                );
+            }
+
+            $operationalItem = OperationalItem::whereKey($operationalItem->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $netQuantity = $totalBaseDrinks - $returned;
+
+            if ($netQuantity > $operationalItem->stock) {
+                throw new \Exception(
+                    "Insufficient stock for {$name}."
+                );
+            }
+
+            $distribution->operationalDetails()->create([
+                'operational_item_id' => $operationalItem->id,
+                'quantity_distributed' => $totalBaseDrinks,
+                'quantity_returned' => $returned,
+            ]);
+
+            if ($netQuantity > 0) {
+                $operationalItem->decrement('stock', $netQuantity);
+            }
+        }
+
+        /*
+        * 2. Process other operational items manually.
+        */
+        foreach ($items as $item) {
+            $operationalItemId = (int) $item['operational_item_id'];
+
+            // Skip cup and lid because they are handled automatically.
+            if (in_array($operationalItemId, $automaticIds)) {
+                continue;
+            }
+
+            $operationalItem = OperationalItem::whereKey($operationalItemId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $distributed = (int) $item['quantity_distributed'];
+            $returned = (int) $item['quantity_returned'];
+
+            if ($returned > $distributed) {
+                throw new \Exception(
+                    "Returned quantity cannot exceed distributed quantity for {$operationalItem->name}."
+                );
+            }
+
+            $netQuantity = $distributed - $returned;
+
+            if ($netQuantity > $operationalItem->stock) {
+                throw new \Exception(
+                    "Insufficient stock for {$operationalItem->name}."
+                );
+            }
+
+            $distribution->operationalDetails()->create([
+                'operational_item_id' => $operationalItem->id,
+                'quantity_distributed' => $distributed,
+                'quantity_returned' => $returned,
+            ]);
+
+            if ($netQuantity > 0) {
+                $operationalItem->decrement('stock', $netQuantity);
+            }
+        }
     }
 }
