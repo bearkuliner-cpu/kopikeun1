@@ -163,6 +163,111 @@
 
 
             {{-- ========================================================= --}}
+            {{-- Sales Summary --}}
+            {{-- ========================================================= --}}
+
+            <x-app-card class="mt-6">
+
+                <div class="mb-5">
+                    <h3 class="text-base font-bold text-stone-900">
+                        Sales Summary
+                    </h3>
+
+                    <p class="mt-1 text-sm text-stone-500">
+                        Comparison between distributed and sold base drinks.
+                    </p>
+                </div>
+
+                @if ($salesSummary->isNotEmpty())
+
+                    <div class="overflow-hidden rounded-lg border border-stone-200">
+
+                        {{-- Table Header --}}
+                        <div class="grid grid-cols-4 bg-stone-50 px-4 py-3
+                                    text-xs font-semibold text-stone-600">
+
+                            <span>Base Drink</span>
+
+                            <span class="text-center">
+                                Distributed
+                            </span>
+
+                            <span class="text-center">
+                                Sold
+                            </span>
+
+                            <span class="text-right">
+                                Remaining
+                            </span>
+
+                        </div>
+
+                        {{-- Table Body --}}
+                        @foreach ($salesSummary as $summary)
+
+                            <div class="grid grid-cols-4 border-t border-stone-200
+                                        px-4 py-3 text-sm">
+
+                                <span class="font-medium text-stone-800">
+                                    {{ $summary['base_drink'] }}
+                                </span>
+
+                                <span class="text-center text-stone-600">
+                                    {{ $summary['distributed'] }}
+                                </span>
+
+                                <span class="text-center font-semibold text-stone-800">
+                                    {{ $summary['sold'] }}
+                                </span>
+
+                                <span class="text-right font-semibold
+                                    {{ $summary['remaining'] < 0
+                                        ? 'text-red-600'
+                                        : 'text-emerald-700' }}">
+
+                                    {{ $summary['remaining'] }}
+
+                                </span>
+
+                            </div>
+
+                        @endforeach
+
+                    </div>
+
+                    {{-- Explanation --}}
+                    <div class="mt-4 rounded-lg bg-stone-50 px-4 py-3
+                                text-sm text-stone-600">
+
+                        <span class="font-semibold">
+                            Remaining
+                        </span>
+                        represents the difference between distributed and sold quantities:
+
+                        <span class="font-semibold">
+                            Distributed − Sold
+                        </span>.
+
+                    </div>
+
+                @else
+
+                    <div class="rounded-lg border border-dashed border-stone-300
+                                px-4 py-6 text-center">
+
+                        <p class="text-sm text-stone-500">
+                            No base drink distribution data available for sales summary.
+                        </p>
+
+                    </div>
+
+                @endif
+
+            </x-app-card>
+
+
+
+            {{-- ========================================================= --}}
             {{-- Base Drinks --}}
             {{-- ========================================================= --}}
 

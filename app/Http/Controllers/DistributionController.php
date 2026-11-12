@@ -273,9 +273,13 @@ class DistributionController extends Controller
     /**
      * Display the specified distribution.
      */
+    
     public function show(
         Distribution $distribution
     ): View {
+        /*
+        * Load distribution relationships.
+        */
         $distribution->load([
             'assignment.employee.user',
             'assignment.cart',
@@ -284,11 +288,53 @@ class DistributionController extends Controller
             'operationalDetails.operationalItem',
         ]);
 
+        /*
+        * Get sales linked to this distribution.
+        */
+        $sales = Sale::with([
+            'details.product',
+        ])
+            ->where('distribution_id', $distribution->id)
+            ->get();
+
+        /*
+        * Calculate sold quantities grouped by base drink.
+        */
+        $soldQuantities = $sales
+            ->flatMap(fn ($sale) => $sale->details)
+            ->filter(fn ($detail) => $detail->product !== null)
+            ->groupBy(fn ($detail) => $detail->product->base_drink_id)
+            ->map(fn ($details) => $details->sum('quantity'));
+
+        /*
+        * Build sales summary.
+        */
+        $salesSummary = $distribution->productDetails
+            ->groupBy('base_drink_id')
+            ->map(function ($details, $baseDrinkId) use ($soldQuantities) {
+                $firstDetail = $details->first();
+
+                $distributed = $details->sum('quantity_distributed');
+                $sold = (int) $soldQuantities->get($baseDrinkId, 0);
+
+                return [
+                    'base_drink' => $firstDetail->baseDrink->name,
+                    'distributed' => $distributed,
+                    'sold' => $sold,
+                    'remaining' => $distributed - $sold,
+                ];
+            })
+            ->values();
+
         return view(
             'distributions.show',
-            compact('distribution')
+            compact(
+                'distribution',
+                'salesSummary'
+            )
         );
     }
+
 
     /**
      * Show edit form.
